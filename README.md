@@ -26,7 +26,8 @@ its calendar driver.
 ## M1 result
 
 Each sector is a regression on heating degree days, last month's heating degree days, and days
-in the month. The out-of-sample window is the last 36 months (2023-09 to 2026-08).
+in the month. Training start year, degree day base temperature and month effects are chosen by
+validation inside the training period (see [STATS.md](STATS.md)). The out-of-sample window is the last 36 months (2023-09 to 2026-08).
 
 | Sector | Seasonal naive MAPE | Regression, normal weather | Regression, actual weather |
 |---|---|---|---|
