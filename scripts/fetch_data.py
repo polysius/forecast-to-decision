@@ -41,12 +41,12 @@ def read_eia_series(wanted_ids: set[str]) -> dict[str, dict]:
     response = requests.get(EIA_BULK_URL, timeout=120)
     response.raise_for_status()
     found = {}
-    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-        with archive.open("NG.txt") as bulk_file:
-            for line in bulk_file:
-                record = json.loads(line)
-                if record.get("series_id") in wanted_ids:
-                    found[record["series_id"]] = record
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    with archive, archive.open("NG.txt") as bulk_file:
+        for line in bulk_file:
+            record = json.loads(line)
+            if record.get("series_id") in wanted_ids:
+                found[record["series_id"]] = record
     missing = wanted_ids - found.keys()
     if missing:
         raise RuntimeError(f"Series missing from EIA bulk file: {sorted(missing)}")

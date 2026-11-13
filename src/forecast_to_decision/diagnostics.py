@@ -7,12 +7,12 @@ import matplotlib
 
 matplotlib.use("Agg")  # write files only, no display needed
 
-import matplotlib.pyplot as plt  # noqa: E402
-import pandas as pd  # noqa: E402
-import statsmodels.api as sm  # noqa: E402
-from statsmodels.regression.linear_model import RegressionResultsWrapper  # noqa: E402
-from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan  # noqa: E402
-from statsmodels.stats.stattools import durbin_watson, jarque_bera  # noqa: E402
+import matplotlib.pyplot as plt
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.regression.linear_model import RegressionResultsWrapper
+from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson, jarque_bera
 
 LJUNG_BOX_LAGS = 12
 
