@@ -1,0 +1,12 @@
+{
+  "residential": {
+    "start_year": 2013,
+    "base_temp_f": 60.0,
+    "month_effects": true
+  },
+  "commercial": {
+    "start_year": 2013,
+    "base_temp_f": 60.0,
+    "month_effects": false
+  }
+}

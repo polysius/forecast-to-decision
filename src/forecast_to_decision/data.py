@@ -56,14 +56,14 @@ def monthly_degree_days(daily: pd.DataFrame, base_temp: float = HDD_BASE_TEMP_F)
     return table
 
 
-def build_dataset(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
+def build_dataset(raw_dir: Path = RAW_DIR, base_temp: float = HDD_BASE_TEMP_F) -> pd.DataFrame:
     """One row per month with deliveries, prices, weather, and customer counts.
 
     Customer counts are annual, so every month takes its calendar year's count.
     Years beyond the last published count are left empty.
     """
     gas = load_monthly_gas(raw_dir)
-    weather = monthly_degree_days(load_daily_temps(raw_dir))
+    weather = monthly_degree_days(load_daily_temps(raw_dir), base_temp)
     customers = load_customers(raw_dir)
 
     table = gas.join(weather[["hdd"]], how="inner")
