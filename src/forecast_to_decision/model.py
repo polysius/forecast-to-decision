@@ -51,7 +51,15 @@ CANDIDATE_SPECS = [
 
 
 def add_lagged_weather(table: pd.DataFrame) -> pd.DataFrame:
-    """Add last month's HDD; the first month has no lag and is dropped."""
+    """Add last month's HDD; the first month has no lag and is dropped.
+
+    Later code shifts by rows (lags, the 12 month baseline, the holdout split),
+    so a gap in the months would silently misalign them. Fail loudly instead.
+    """
+    expected = pd.date_range(table.index[0], table.index[-1], freq="MS")
+    if not table.index.equals(expected):
+        missing = expected.difference(table.index)
+        raise ValueError(f"Monthly table has gaps: {[f'{m:%Y-%m}' for m in missing]}")
     table = table.copy()
     table["hdd_lag1"] = table["hdd"].shift(1)
     return table.dropna(subset=["hdd_lag1"])

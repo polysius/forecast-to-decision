@@ -35,9 +35,10 @@ validation inside the training period (see [STATS.md](STATS.md)). The out-of-sam
 | Commercial | 12.5% | 15.1% | 13.2% |
 
 With actual weather the residential model beats the baseline. With normal weather, which is
-all a forecaster knows in advance, it does not beat seasonal naive in either sector. Most of the
-remaining error is weather the model cannot see ahead of time. M2 therefore treats the forecast
-as uncertain and tests the plan against forecast error.
+all a forecaster knows in advance, it does not beat seasonal naive on MAPE or MAE in either
+sector, although its RMSE is lower. Knowing the weather removes about half of the residential
+error and little of the commercial error, so the rest comes from the model itself. M2 treats the
+forecast as uncertain and tests the plan against forecast error.
 
 Residuals are autocorrelated and their variance is not constant, so the confidence intervals
 should be read as approximate. The full tables, diagnostics and plots are in

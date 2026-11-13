@@ -33,6 +33,13 @@ def synthetic_table() -> pd.DataFrame:
     return add_lagged_weather(table)
 
 
+def test_a_gap_in_the_months_is_rejected(synthetic_table):
+    with_gap = synthetic_table.drop(pd.Timestamp("2015-03-01"))
+
+    with pytest.raises(ValueError, match="2015-03"):
+        add_lagged_weather(with_gap)
+
+
 def test_fit_recovers_the_weather_coefficient(synthetic_table):
     model = fit_sector_model(synthetic_table, "residential", SPEC)
 

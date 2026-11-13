@@ -12,6 +12,7 @@ import pandas as pd
 
 from forecast_to_decision.data import SECTORS, build_dataset
 from forecast_to_decision.diagnostics import (
+    LJUNG_BOX_LAGS,
     ResidualTests,
     coefficient_table,
     plot_holdout_forecasts,
@@ -20,7 +21,10 @@ from forecast_to_decision.diagnostics import (
 )
 from forecast_to_decision.model import (
     BASE_TEMPS_F,
+    HAC_LAGS,
     HOLDOUT_MONTHS,
+    NORMAL_WINDOW_YEARS,
+    START_YEARS,
     ErrorScores,
     Spec,
     add_lagged_weather,
@@ -153,7 +157,7 @@ R² {result.r_squared:.3f} (adjusted {result.adj_r_squared:.3f}).
 
 ### Coefficients
 
-Units: MMcf per unit of the driver. Standard errors and intervals are Newey-West (12 lags).
+Units: MMcf per unit of the driver. Standard errors and intervals are Newey-West ({HAC_LAGS} lags).
 
 {coefficient_markdown(result)}
 
@@ -162,7 +166,7 @@ Units: MMcf per unit of the driver. Standard errors and intervals are Newey-West
 | Test | Statistic or p-value | Reading |
 |---|---|---|
 | Durbin-Watson | {tests.durbin_watson:.2f} | 2 means no first-order autocorrelation |
-| Ljung-Box, 12 lags | p = {tests.ljung_box_p:.3g} | small p: residuals are autocorrelated |
+| Ljung-Box, {LJUNG_BOX_LAGS} lags | p = {tests.ljung_box_p:.3g} | small p: residuals are autocorrelated |
 | Breusch-Pagan | p = {tests.breusch_pagan_p:.3g} | small p: variance is not constant |
 | Jarque-Bera | p = {tests.jarque_bera_p:.3g} | small p: residuals are not normal |
 
@@ -197,7 +201,7 @@ The first training year, HDD base temperature and month effects are chosen by va
 candidate is fitted on the training period without its last {HOLDOUT_MONTHS} months and scored
 on those {HOLDOUT_MONTHS} months using normal weather. The holdout of the final
 {HOLDOUT_MONTHS} months is removed before this choice, scored once, and not used to tune
-anything. Candidates: first year in 1989, 2000, 2008, 2013; base temperature in
+anything. Candidates: first year in {", ".join(str(y) for y in START_YEARS)}; base temperature in
 {", ".join(f"{base:.0f}" for base in BASE_TEMPS_F)} F; month effects on or off.
 
 Three forecasts are compared on the holdout:
@@ -205,7 +209,7 @@ Three forecasts are compared on the holdout:
 * Seasonal naive: the same month one year earlier. It sees fresh data every month, which is
   generous to the baseline.
 * Regression with normal weather: the fitted model with each month's HDD replaced by its
-  30-year average from the training period. This is the honest forecast, because weather is
+  {NORMAL_WINDOW_YEARS}-year average from the training period. This is the honest forecast, because weather is
   unknown in advance. Later milestones use it.
 * Regression with actual weather: the same model given the weather that occurred. It is not a
   forecast. It shows how much of the error is weather and how much is the model.
