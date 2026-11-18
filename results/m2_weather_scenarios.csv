@@ -1,0 +1,7 @@
+plan_year,plan,expected_cost_musd,expected_served_percent,scenarios_with_shortfall,scenarios
+2023-09 to 2024-08,Rule of thumb,1614.606,99.860,5,30
+2023-09 to 2024-08,Optimised plan,1593.615,99.862,5,30
+2024-09 to 2025-08,Rule of thumb,1888.795,99.856,5,30
+2024-09 to 2025-08,Optimised plan,1863.828,99.860,5,30
+2025-09 to 2026-08,Rule of thumb,2098.808,99.856,5,30
+2025-09 to 2026-08,Optimised plan,2071.628,99.860,5,30

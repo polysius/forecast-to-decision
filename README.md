@@ -9,7 +9,7 @@ gas utility do, and how much does the forecast error cost? It is built in four m
 | Milestone | Topic | Status |
 |---|---|---|
 | M1 | Interpretable regression forecast | Done, see [STATS.md](STATS.md) |
-| M2 | Supply plan optimisation (LP) | Not started |
+| M2 | Supply plan optimisation (MIP) | Done, see [OPTIMISATION.md](OPTIMISATION.md) |
 | M3 | Forecast-vs-actual variance analysis | Not started |
 | M4 | Excel workbook, Power BI model, business summary | Not started |
 
@@ -44,12 +44,37 @@ Residuals are autocorrelated and their variance is not constant, so the confiden
 should be read as approximate. The full tables, diagnostics and plots are in
 [STATS.md](STATS.md).
 
+## M2 result
+
+The forecast feeds a supply plan: how much pipeline gas to buy each month, and whether to
+contract peaking supply, before the weather is known. Storage, peaking and resale then adjust to
+the demand that happens. Peaking is a yes or no choice per month, so the plan is a mixed integer
+program, solved with OR-Tools. The formulation and every assumption are in
+[OPTIMISATION.md](OPTIMISATION.md). Pipeline, storage and peaking sizes, fees and penalties are
+assumptions, not data.
+
+Three plans are scored on the actual demand of the three holdout plan years (September to
+August):
+
+| Plan | Cost over three years | Demand served |
+|---|---|---|
+| Rule of thumb (forecast plus 5%, peaking in winter) | $5,077M | 100% |
+| Optimised over 30 weather scenarios | $5,053M | 100% |
+| Perfect hindsight (a floor, not a plan) | $5,008M | 100% |
+
+The optimised plan is $24M cheaper than the rule of thumb and closes about a third of the gap to
+hindsight. In the second plan year it costs slightly more than the rule, so the gain is not
+uniform. The two plans differ most when demand surprises on the high side. If realised demand is
+15% above the forecast, the rule of thumb costs $2,540M per year and serves 97.8% of demand,
+while the optimised plan costs $2,385M and serves 98.6%.
+
 ## Run it
 
 ```
 pip install -e ".[dev]"
 python scripts/fetch_data.py   # optional, the extracts are committed under data/raw
 python scripts/run_m1.py       # rewrites STATS.md, docs/figures and results/
+python scripts/run_m2.py       # needs the M1 results; rewrites OPTIMISATION.md
 pytest
 ```
 
@@ -57,9 +82,9 @@ pytest
 
 ```
 data/raw/                 committed extracts of the EIA and NOAA data
-src/forecast_to_decision/ data loading, model, diagnostics
-scripts/                  fetch_data.py, run_m1.py
-results/                  holdout forecasts and chosen model specs
+src/forecast_to_decision/ data loading, model, diagnostics, scenarios, supply plan optimiser
+scripts/                  fetch_data.py, run_m1.py, run_m2.py
+results/                  M1 holdout forecasts and specs, M2 plan comparison and sensitivity
 docs/figures/             diagnostic and forecast plots
 tests/                    unit tests that run offline
 ```
