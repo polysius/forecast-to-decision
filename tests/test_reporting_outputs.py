@@ -298,7 +298,9 @@ def test_validation_rejects_bad_values_instead_of_only_existing():
         assert validation.errorStyle in (None, "stop")
 
 
-def test_the_error_input_is_clamped_to_the_tested_grid_even_if_validation_is_bypassed():
+def test_the_error_input_formula_contains_the_clamp():
+    """Checks the formula text only. add_pivots.ps1 checks the behaviour with Excel on every
+    build: it writes +/-40% into the input and fails unless the costs equal the +/-15% row."""
     scenario = load_workbook(WORKBOOK)["Scenario"]
     formulas = [cell.value for row in scenario.iter_rows() for cell in row]
 

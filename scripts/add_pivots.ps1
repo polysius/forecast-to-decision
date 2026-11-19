@@ -37,6 +37,23 @@ function Add-SumField($pivot, [string]$field, [string]$caption, [string]$format)
     $dataField.NumberFormat = $format
 }
 
+function Find-Row($sheet, [string]$text) {
+    foreach ($row in 1..60) {
+        if ($sheet.Cells.Item($row, 1).Value2 -eq $text) { return $row }
+    }
+    throw "Could not find '$text' in column A of $($sheet.Name)"
+}
+
+function Read-PlanCosts($sheet, [int]$errorRow, [double]$errorValue, $plans) {
+    $sheet.Cells.Item($errorRow, 2).Value2 = $errorValue
+    $excel.CalculateFull()
+    $costs = @()
+    foreach ($plan in $plans) {
+        $costs += [double]$sheet.Cells.Item((Find-Row $sheet $plan), 2).Value2
+    }
+    return $costs
+}
+
 function Release-ComObject($object) {
     if ($null -ne $object) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($object) }
 }
@@ -73,6 +90,23 @@ try {
     $revenue.RefreshTable() | Out-Null
     $variance.RefreshTable() | Out-Null
     $sheet.Columns("A:H").AutoFit() | Out-Null
+
+    # Behaviour check: an error input outside the tested grid must give the grid edge,
+    # not an extrapolation. This fails the build if the clamp in the Scenario sheet breaks.
+    $scenario = $workbook.Worksheets.Item("Scenario")
+    $errorRow = Find-Row $scenario "Realised demand vs forecast"
+    $plans = "Rule of thumb", "Optimised plan", "Perfect hindsight"
+    foreach ($edge in @(@(0.40, 0.15), @(-0.40, -0.15))) {
+        $outside = Read-PlanCosts $scenario $errorRow $edge[0] $plans
+        $atEdge = Read-PlanCosts $scenario $errorRow $edge[1] $plans
+        for ($i = 0; $i -lt $plans.Count; $i++) {
+            if ([math]::Abs($outside[$i] - $atEdge[$i]) -gt 1e-9) {
+                throw "Scenario clamp failed for $($plans[$i]): $($outside[$i]) at $($edge[0]) but $($atEdge[$i]) at $($edge[1])"
+            }
+        }
+    }
+    $scenario.Cells.Item($errorRow, 2).Value2 = 0
+    $excel.CalculateFull()
 
     $workbook.SaveAs($outputFull, $xlOpenXmlWorkbook)
     $workbook.Close($false)
