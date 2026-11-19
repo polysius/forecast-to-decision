@@ -195,11 +195,7 @@ Under this rule the three plans cost $5824.8M (rule of thumb), $5833.6M (optimis
   demand or a different standby fee can change which plan wins.
 * Pipeline gas is priced at the month's realised citygate price, so price risk is out of scope.
   Only demand is uncertain.
-* In this EIA series the Massachusetts citygate price is usually at or above its winter level in
-  summer. Averaged over 1989 to 1999, 2000 to 2012, 2013 to 2023 and 2024 to 2026, summer is
-  higher in every period, although not in every single year. The plans respond to that price
-  shape, so the usual buy cheap in summer and store logic is weak here. A different price series
-  would change the storage behaviour.
+* In this EIA series the Massachusetts citygate price is higher in summer than in winter on average in 4 of 4 periods (1989 to 1999, 2000 to 2012, 2013 to 2023, 2024 to 2026), and in 31 of 38 individual years. The plans respond to that price shape, so the usual buy cheap in summer and store logic is weak here. A different price series would change the storage behaviour.
 * The saving depends on the end-of-year storage rule (see the robustness section above).
 * The EIA citygate price is missing for 2026-03. It was filled by linear interpolation between the neighbouring months.
 * The scenarios hold the weather of a past year fixed across the whole plan year and ignore the

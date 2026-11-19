@@ -41,6 +41,8 @@ PLAN_NAMES = (RULE, OPTIMISED, HINDSIGHT)
 FORECAST_ERRORS = (-0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15)
 RULE_RESERVE = 0.05
 RULE_PEAKING_MONTHS = (12, 1, 2)
+# Year ranges used to describe how citygate prices behave across the series.
+PRICE_PERIODS = ((1989, 1999), (2000, 2012), (2013, 2023), (2024, 2026))
 
 
 @dataclass
@@ -393,6 +395,37 @@ def verdict(actual_totals: pd.DataFrame) -> str:
     return sentence
 
 
+def seasonal_price_summary(price_history: pd.Series) -> str:
+    """Compare summer and winter citygate prices, by period and by individual year.
+
+    Summer is June to August of a year. Winter is the December before it and the
+    January and February of that year. Months with no price are ignored.
+    """
+    summer = price_history[price_history.index.month.isin((6, 7, 8))]
+    winter = price_history[price_history.index.month.isin((12, 1, 2))]
+    summer_by_year = summer.groupby(summer.index.year).mean()
+    # December belongs to the next calendar year's winter.
+    winter_year = winter.index.year + (winter.index.month == 12)
+    winter_by_year = winter.groupby(winter_year).mean()
+    yearly = pd.DataFrame({"summer": summer_by_year, "winter": winter_by_year}).dropna()
+
+    periods = [
+        (start, end, yearly.loc[start:end])
+        for start, end in PRICE_PERIODS
+        if not yearly.loc[start:end].empty
+    ]
+    periods_higher = sum(rows["summer"].mean() > rows["winter"].mean() for _, _, rows in periods)
+    years_higher = int((yearly["summer"] > yearly["winter"]).sum())
+    return (
+        f"In this EIA series the Massachusetts citygate price is higher in summer than in winter "
+        f"on average in {periods_higher} of {len(periods)} periods "
+        f"({', '.join(f'{start} to {end}' for start, end, _ in periods)}), and in "
+        f"{years_higher} of {len(yearly)} individual years. The plans respond to that price "
+        "shape, so the usual buy cheap in summer and store logic is weak here. A different "
+        "price series would change the storage behaviour."
+    )
+
+
 def strict_storage_verdict(strict_totals: pd.DataFrame) -> str:
     cost = strict_totals.set_index("plan")["cost_musd"]
     saving = cost[RULE] - cost[OPTIMISED]
@@ -432,6 +465,7 @@ def write_document(
     scenarios: pd.DataFrame,
     sensitivity: pd.DataFrame,
     strict_totals: pd.DataFrame,
+    price_history: pd.Series,
     imputed_price_months: list[str],
 ) -> None:
     imputed_note = (
@@ -542,11 +576,7 @@ is solved again under that rule. Totals over the three plan years, on actual dem
   demand or a different standby fee can change which plan wins.
 * Pipeline gas is priced at the month's realised citygate price, so price risk is out of scope.
   Only demand is uncertain.
-* In this EIA series the Massachusetts citygate price is usually at or above its winter level in
-  summer. Averaged over 1989 to 1999, 2000 to 2012, 2013 to 2023 and 2024 to 2026, summer is
-  higher in every period, although not in every single year. The plans respond to that price
-  shape, so the usual buy cheap in summer and store logic is weak here. A different price series
-  would change the storage behaviour.
+* {seasonal_price_summary(price_history)}
 * The saving depends on the end-of-year storage rule (see the robustness section above).
 {imputed_note}
 * The scenarios hold the weather of a past year fixed across the whole plan year and ignore the
@@ -582,7 +612,11 @@ def main() -> None:
     plot_nominations(commitments, FIGURES_DIR / "m2_nominations.png")
     plot_sensitivity(sensitivity, FIGURES_DIR / "m2_sensitivity.png")
     strict.to_csv(RESULTS_DIR / "m2_strict_storage.csv", index=False, float_format="%.3f")
-    write_document(years, actual, totals, scenarios, sensitivity, strict_totals, imputed_price_months)
+    price_history = build_dataset()["citygate_price"]
+    write_document(
+        years, actual, totals, scenarios, sensitivity, strict_totals, price_history,
+        imputed_price_months,
+    )
     print(totals.round(2).to_string(index=False))
 
 
