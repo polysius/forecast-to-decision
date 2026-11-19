@@ -15,19 +15,22 @@ to actual in four steps, and each step changes one thing, so the effects add up 
 1. **Weather.** Replace normal weather with the weather that happened, using the M1 regression
    for both. Effect: (weather adjusted forecast minus forecast) times budget price.
 2. **Volume.** Move total deliveries from the weather adjusted forecast to the actual total,
-   keeping the forecast split between sectors. Effect: change in total volume times the budget
-   price of the forecast mix.
-3. **Mix.** Move from the forecast split between residential and commercial to the actual
-   split. Residential gas sells at a higher price, so shifting toward commercial lowers revenue.
+   keeping the weather adjusted forecast's split between sectors. Effect: change in total
+   volume times the budget price of that split.
+3. **Mix.** Move from the weather adjusted forecast's split between residential and commercial
+   to the actual split. The two sectors pay different prices, so the split changes revenue.
    Effect: actual volume times the change in each sector's share times its budget price.
 4. **Price.** Charge the actual prices. Effect: actual volume times (actual minus budget price).
 
 Positive means actual is above forecast. Periods are consecutive blocks of
-3 months starting in September, so each period is one season. The effects
-are computed month by month and added up within each period.
+3 months starting with the first month of the holdout. The effects are
+computed month by month and added up within each period.
 
-The budget price is the same month one year earlier, from the EIA residential and commercial
-price series. It stands in for the price a planner would have assumed.
+The budget price is an assumption, because the EIA data has no record of the prices a planner
+assumed. The main table uses a rolling rule: each month is priced at the same month one year
+earlier, as a budget set a year ahead would be. The M1 forecast itself was made once, with data
+up to the start of the holdout, so the section on the budget price below repeats the analysis
+with prices frozen at what was known then.
 
 ## Revenue variance
 
@@ -50,7 +53,7 @@ difference between their sum and the variance is 1.7e-13, which is rounding.
 | 2026-06 to 2026-08 | 418.5 | 383.5 | -35.0 | -8.1 | -75.5 | +9.1 | +39.5 |
 | Total | 13,724.9 | 13,595.6 | -129.3 | -275.1 | -654.5 | +57.7 | +742.5 |
 
-Over the 12 periods actual revenue was $129.3M below the forecast of $13,724.9M. The effects in $M were: weather -275.1, volume -654.5, mix +57.7, price +742.5. The largest effect over the whole span is price. Weather accounts for 27% of the absolute variance summed over all four effects and all periods, and it moves in both directions from period to period.
+Over the 12 periods actual revenue was $129.3M below the forecast of $13,724.9M. The effects in $M were: weather -275.1, volume -654.5, mix +57.7, price +742.5. The largest effect over the whole span is price. Weather accounts for 27% of the absolute variance summed over all four effects and all periods. The weather effect was positive in 2 periods and negative in 10. The volume effect was negative in 11 of 12 periods.
 
 ![Revenue variance by component](docs/figures/m3_variance.png)
 
@@ -75,14 +78,24 @@ that happened. The rest is everything the regression does not explain.
 | 2026-06 to 2026-08 | 20,740 | 16,650 | -343 | -3,746 |
 | Total | 707,588 | 658,788 | -15,763 | -33,037 |
 
+## Sensitivity to the budget price
+
+The choice of budget price changes the forecast revenue as well as the split of the variance.
+Totals over all 12 periods, in $M:
+
+| Budget price rule | Forecast ($M) | Actual ($M) | Variance ($M) | Weather | Volume | Mix | Price |
+|---|---|---|---|---|---|---|---|
+| Rolling: same month one year earlier | 13,724.9 | 13,595.6 | -129.3 | -275.1 | -654.5 | +57.7 | +742.5 |
+| Frozen: last twelve months known at the forecast origin | 13,816.9 | 13,595.6 | -221.3 | -290.5 | -617.8 | +39.9 | +647.0 |
+
 ## Limitations
 
 * Volume holds two things that this data cannot separate: real changes in how much gas
   customers use, and the regression's own error.
 * The weather effect comes from the same regression that made the forecast, so it inherits
   that model's weaknesses (see STATS.md).
-* The budget price is an assumption. A different rule for it moves revenue between the price
-  effect and the others.
+* The budget price is an assumption. A different rule changes the forecast revenue, the total
+  variance and the price effect, as the section above shows.
 * Revenue here is deliveries times retail price. It is not margin, because the cost of buying
   the gas is not netted off.
 * Customer counts are annual and stop in 2024, so the volume effect is not split into customer

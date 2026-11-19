@@ -82,13 +82,17 @@ price for residential and commercial customers. The gap is split into weather, v
 (residential against commercial) and price, and the four effects add up to the variance in every
 period.
 
-Over the twelve periods actual revenue was $129M below a forecast of $13,725M, about 1%. That
-small total hides large effects that cancel: price added $743M, while volume took off $655M,
-weather $275M, and mix added $58M. Weather matters most in winter and changes sign from one
-winter to the next. The volume effect is negative in most periods, which means deliveries ran
-below even the weather adjusted forecast. It holds both real demand changes and the model's
-own error, and this data cannot separate them. The budget price is an assumption (the same
-month a year earlier), so the split between price and the other effects depends on it.
+Over the twelve periods actual revenue was $129.3M below a forecast of $13,724.9M, about 1%.
+That small total hides large effects that cancel: price added $742.5M and mix added $57.7M,
+while volume took off $654.5M and weather $275.1M. The weather effect was negative in ten of
+twelve periods. In the three winters it was -$197.5M, +$62.3M and +$227.5M. The volume effect
+was negative in eleven periods, so deliveries ran below even the weather adjusted forecast. It
+holds both real demand changes and the model's own error, and this data cannot separate them.
+
+The budget price is an assumption. The main table prices each month at the same month a year
+earlier. Freezing the price at what was known when the forecast was made gives a forecast of
+$13,816.9M and a gap of $221.3M, with price adding $647.0M. The size of the price effect and of
+the total gap both depend on this rule.
 
 ## Run it
 

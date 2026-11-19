@@ -5,11 +5,12 @@ normal-weather forecast at a budget price. The actual is what was delivered at t
 price that was charged. The gap is moved from forecast to actual in four steps, and
 each step changes one thing, so the four effects add up exactly to the total:
 
-1. Weather: use the weather that happened instead of normal weather.
-2. Volume: move total deliveries to what was actually delivered, keeping the sector
-   split the forecast had.
-3. Mix: move from the forecast split between residential and commercial to the
-   actual split. Residential gas is sold at a higher price, so the split matters.
+1. Weather: use the weather that happened instead of normal weather. The result is
+   the weather adjusted forecast.
+2. Volume: move total deliveries from the weather adjusted forecast to what was
+   actually delivered, keeping the sector split of the weather adjusted forecast.
+3. Mix: move from that sector split to the actual split between residential and
+   commercial. The two sectors pay different prices, so the split matters.
 4. Price: charge the prices that were actually charged.
 
 Volume is whatever total demand differs from the weather adjusted forecast. It holds
@@ -29,8 +30,43 @@ COMPONENTS = ("weather", "volume", "mix", "price")
 
 
 def budget_prices(price_history: pd.DataFrame) -> pd.DataFrame:
-    """The price assumed when the forecast was made: the same month one year earlier."""
-    return price_history.shift(12)
+    """A rolling budget price: each month is priced at the same month one year earlier.
+
+    The lookup is by date, so a missing month in the history gives a missing budget
+    price, never the price of a neighbouring month.
+    """
+    moved_forward = price_history.copy()
+    moved_forward.index = moved_forward.index + pd.DateOffset(years=1)
+    return moved_forward.reindex(price_history.index)
+
+
+def frozen_budget_prices(
+    price_history: pd.DataFrame, months: pd.DatetimeIndex, origin: pd.Timestamp
+) -> pd.DataFrame:
+    """A fixed budget price: the last twelve months known at the forecast origin.
+
+    Each month in `months` is priced at the same calendar month within the twelve
+    months ending at `origin`, which is all the price information a forecast made at
+    `origin` could have used.
+    """
+    last_year = price_history.loc[origin - pd.DateOffset(months=11) : origin]
+    by_calendar_month = last_year.set_index(last_year.index.month)
+    frozen = by_calendar_month.loc[months.month]
+    frozen.index = months
+    return frozen
+
+
+def _require_matching_finite_inputs(frames: dict[str, pd.DataFrame]) -> None:
+    """The effects only add up to the total if every input covers the same months and sectors."""
+    reference_name, reference = next(iter(frames.items()))
+    for name, frame in frames.items():
+        if not (frame.index.equals(reference.index) and list(frame.columns) == list(SECTORS)):
+            raise ValueError(
+                f"{name} must have the sector columns {list(SECTORS)} and the same months "
+                f"as {reference_name}"
+            )
+        if frame.isna().any().any():
+            raise ValueError(f"{name} has missing values")
 
 
 def decompose_revenue_variance(
@@ -46,8 +82,19 @@ def decompose_revenue_variance(
     are MMcf and prices are $/Mcf. The result has forecast and actual revenue, the
     four effects, and their sum, which equals actual minus forecast.
     """
+    _require_matching_finite_inputs(
+        {
+            "forecast": forecast,
+            "weather_adjusted_forecast": weather_adjusted_forecast,
+            "actual": actual,
+            "forecast_price": forecast_price,
+            "actual_price": actual_price,
+        }
+    )
     forecast_volume = weather_adjusted_forecast.sum(axis=1)
     actual_volume = actual.sum(axis=1)
+    if (forecast_volume <= 0).any() or (actual_volume <= 0).any():
+        raise ValueError("Total volume must be positive in every month to compute sector shares")
     forecast_share = weather_adjusted_forecast.div(forecast_volume, axis=0)
     actual_share = actual.div(actual_volume, axis=0)
 

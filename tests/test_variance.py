@@ -6,6 +6,7 @@ from forecast_to_decision.variance import (
     COMPONENTS,
     budget_prices,
     decompose_revenue_variance,
+    frozen_budget_prices,
     sum_by_period,
     volume_variance,
 )
@@ -90,6 +91,52 @@ def test_budget_price_is_the_same_month_one_year_earlier():
 
     assert budget.loc["2023-02-01", "residential"] == prices.loc["2022-02-01", "residential"]
     assert budget.iloc[:12].isna().all().all()
+
+
+def test_budget_price_is_looked_up_by_date_when_a_month_is_missing():
+    months = pd.date_range("2022-01-01", periods=20, freq="MS").delete(6)  # no 2022-07
+    prices = pd.DataFrame({"residential": np.arange(19.0)}, index=months)
+
+    budget = budget_prices(prices)
+
+    assert budget.loc["2023-03-01", "residential"] == prices.loc["2022-03-01", "residential"]
+    assert np.isnan(budget.loc["2023-07-01", "residential"])
+
+
+def test_frozen_budget_prices_use_the_year_before_the_forecast_origin():
+    months = pd.date_range("2020-01-01", periods=36, freq="MS")
+    prices = pd.DataFrame({"residential": np.arange(36.0)}, index=months)
+    holdout = pd.date_range("2023-01-01", periods=3, freq="MS")  # origin is 2022-12
+
+    frozen = frozen_budget_prices(prices, holdout, pd.Timestamp("2022-12-01"))
+
+    assert frozen["residential"].tolist() == [24.0, 25.0, 26.0]  # January to March 2022
+
+
+def test_missing_volumes_prices_or_mismatched_months_are_rejected():
+    good = one_month(100, 100)
+    prices = one_month(10, 5)
+    with_nan = one_month(float("nan"), 100)
+    other_month = good.set_axis(pd.DatetimeIndex(["2024-02-01"]))
+    misnamed = prices.rename(columns={"residential": "residential_price"})
+
+    with pytest.raises(ValueError, match="missing values"):
+        decompose_revenue_variance(good, good, with_nan, prices, prices)
+    with pytest.raises(ValueError, match="missing values"):
+        decompose_revenue_variance(good, good, good, with_nan, prices)
+    with pytest.raises(ValueError, match="same months"):
+        decompose_revenue_variance(good, good, other_month, prices, prices)
+    with pytest.raises(ValueError, match="sector columns"):
+        decompose_revenue_variance(good, good, good, misnamed, prices)
+
+
+def test_a_month_with_no_volume_is_rejected_because_shares_are_undefined():
+    good = one_month(100, 100)
+    empty = one_month(0, 0)
+    prices = one_month(10, 5)
+
+    with pytest.raises(ValueError, match="positive"):
+        decompose_revenue_variance(good, empty, good, prices, prices)
 
 
 def test_volume_variance_separates_weather_from_everything_else():
