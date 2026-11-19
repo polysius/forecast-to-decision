@@ -10,7 +10,7 @@ gas utility do, and how much does the forecast error cost? It is built in four m
 |---|---|---|
 | M1 | Interpretable regression forecast | Done, see [STATS.md](STATS.md) |
 | M2 | Supply plan optimisation (MIP) | Done, see [OPTIMISATION.md](OPTIMISATION.md) |
-| M3 | Forecast-vs-actual variance analysis | Not started |
+| M3 | Forecast-vs-actual variance analysis | Done, see [VARIANCE.md](VARIANCE.md) |
 | M4 | Excel workbook, Power BI model, business summary | Not started |
 
 ## Use case
@@ -74,6 +74,26 @@ costs $5,834M against $5,825M for the rule of thumb, so it is $9M more expensive
 sound way to hedge demand risk, but this data does not show that it saves money in every
 setting.
 
+## M3 result
+
+[VARIANCE.md](VARIANCE.md) explains the gap between the M1 forecast and actual gas revenue over
+twelve seasons (September to August, three months each). Revenue is deliveries times the retail
+price for residential and commercial customers. The gap is split into weather, volume, mix
+(residential against commercial) and price, and the four effects add up to the variance in every
+period.
+
+Over the twelve periods actual revenue was $129.3M below a forecast of $13,724.9M, about 1%.
+That small total hides large effects that cancel: price added $742.5M and mix added $57.7M,
+while volume took off $654.5M and weather $275.1M. The weather effect was negative in ten of
+twelve periods. In the three winters it was -$197.5M, +$62.3M and +$227.5M. The volume effect
+was negative in eleven periods, so deliveries ran below even the weather adjusted forecast. It
+holds both real demand changes and the model's own error, and this data cannot separate them.
+
+The budget price is an assumption. The main table prices each month at the same month a year
+earlier. Freezing the price at what was known when the forecast was made gives a forecast of
+$13,816.9M and a gap of $221.3M, with price adding $647.0M. The size of the price effect and of
+the total gap both depend on this rule.
+
 ## Run it
 
 ```
@@ -81,6 +101,7 @@ pip install -e ".[dev]"
 python scripts/fetch_data.py   # optional, the extracts are committed under data/raw
 python scripts/run_m1.py       # rewrites STATS.md, docs/figures and results/
 python scripts/run_m2.py       # needs the M1 results; rewrites OPTIMISATION.md
+python scripts/run_m3.py       # needs the M1 results; rewrites VARIANCE.md
 pytest
 ```
 
@@ -88,9 +109,11 @@ pytest
 
 ```
 data/raw/                 committed extracts of the EIA and NOAA data
-src/forecast_to_decision/ data loading, model, diagnostics, scenarios, supply plan optimiser
-scripts/                  fetch_data.py, run_m1.py, run_m2.py
-results/                  M1 holdout forecasts and specs, M2 plan comparison and sensitivity
+src/forecast_to_decision/ data loading, model, diagnostics, scenarios, supply plan optimiser,
+                          variance decomposition
+scripts/                  fetch_data.py, run_m1.py, run_m2.py, run_m3.py
+results/                  M1 holdout forecasts and specs, M2 plan comparison and sensitivity,
+                          M3 variance tables
 docs/figures/             diagnostic and forecast plots
 tests/                    unit tests that run offline
 ```
