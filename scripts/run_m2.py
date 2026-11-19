@@ -16,6 +16,7 @@ from forecast_to_decision.model import BASE_TEMPS_F, Spec, add_lagged_weather
 from forecast_to_decision.optimisation import (
     PEAKING_SHARE_OF_PEAK,
     PIPELINE_SHARE_OF_PEAK,
+    RULE_RESERVE_FRACTION,
     STORAGE_SHARE_OF_ANNUAL_DEMAND,
     Commitments,
     Outcome,
@@ -40,7 +41,6 @@ OPTIMISED = "Optimised plan"
 HINDSIGHT = "Perfect hindsight"
 PLAN_NAMES = (RULE, OPTIMISED, HINDSIGHT)
 FORECAST_ERRORS = (-0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15)
-RULE_RESERVE = 0.05
 RULE_PEAKING_MONTHS = (12, 1, 2)
 # Year ranges used to describe how citygate prices behave across the series.
 PRICE_PERIODS = ((1989, 1999), (2000, 2012), (2013, 2023), (2024, 2026))
@@ -99,7 +99,7 @@ def load_plan_years() -> tuple[list[PlanYear], list[str]]:
                 forecast=forecast,
                 actual=total.loc[months, "actual_mmcf"].to_numpy(),
                 rule=rule_of_thumb_commitments(
-                    forecast, months.month.to_numpy(), assumptions, RULE_RESERVE, RULE_PEAKING_MONTHS
+                    forecast, months.month.to_numpy(), assumptions, RULE_RESERVE_FRACTION, RULE_PEAKING_MONTHS
                 ),
                 optimised=solve_supply_plan(scenarios, month_prices, assumptions).commitments,
             )
@@ -489,7 +489,7 @@ these numbers, so change them in `SupplyAssumptions` and rerun to test other cas
 
 ## The plans compared
 
-* **Rule of thumb.** Buy the M1 normal-weather forecast plus a {RULE_RESERVE:.0%} reserve each
+* **Rule of thumb.** Buy the M1 normal-weather forecast plus a {RULE_RESERVE_FRACTION:.0%} reserve each
   month, within the pipeline's minimum take and capacity. Contract peaking in December, January
   and February.
 * **Optimised plan.** The stochastic program above, over {len(years[0].scenarios)} demand

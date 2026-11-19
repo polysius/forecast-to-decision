@@ -29,6 +29,9 @@ from ortools.linear_solver import pywraplp
 MMCF_PRICE_TO_MUSD = 1 / 1000
 SHORTFALL_TOLERANCE_MMCF = 1e-4
 
+# The rule of thumb buys the forecast plus this share as a reserve.
+RULE_RESERVE_FRACTION = 0.05
+
 # How `assumptions_from_scenarios` sizes the infrastructure.
 PIPELINE_SHARE_OF_PEAK = 0.8
 STORAGE_SHARE_OF_ANNUAL_DEMAND = 0.12
@@ -271,7 +274,7 @@ def rule_of_thumb_commitments(
     forecast: np.ndarray,
     calendar_months: np.ndarray,
     assumptions: SupplyAssumptions,
-    reserve_fraction: float = 0.05,
+    reserve_fraction: float = RULE_RESERVE_FRACTION,
     peaking_months: tuple[int, ...] = (12, 1, 2),
 ) -> Commitments:
     """A planner's usual plan: buy the forecast plus a reserve, contract peaking in winter.

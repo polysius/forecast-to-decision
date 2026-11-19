@@ -5,12 +5,16 @@ findings, so `check_findings` raises an error if the data no longer supports the
 That way a rerun with different results cannot quietly publish advice that is wrong.
 """
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 
 from forecast_to_decision.datasets import RESULTS_DIR, ReportingTables, load_m1_column
+from forecast_to_decision.optimisation import RULE_RESERVE_FRACTION
+
+NUMBER_WORDS = {2: "two", 3: "three", 4: "four", 5: "five"}
 
 RULE, OPTIMISED, HINDSIGHT = "Rule of thumb", "Optimised plan", "Perfect hindsight"
 EFFECTS = ("weather", "volume", "mix", "price")
@@ -45,6 +49,14 @@ class Findings:
     forecast_revenue: float
     actual_revenue: float
     effects: dict[str, float]
+    first_month: pd.Timestamp
+    last_month: pd.Timestamp
+    months: int
+
+    @property
+    def years_text(self) -> str:
+        years = self.months // 12
+        return NUMBER_WORDS.get(years, str(years))
 
     @property
     def saving(self) -> float:
@@ -124,6 +136,9 @@ def compute_findings(tables: ReportingTables, results_dir: Path = RESULTS_DIR) -
         forecast_revenue=float(sector["forecast_revenue_musd"].sum()),
         actual_revenue=float(sector["actual_revenue_musd"].sum()),
         effects={name: float(variance[f"{name}_musd"].sum()) for name in EFFECTS},
+        first_month=sector["month"].min(),
+        last_month=sector["month"].max(),
+        months=int(sector["month"].nunique()),
     )
 
 
@@ -149,9 +164,13 @@ def check_findings(f: Findings) -> None:
         and f.optimised_service_at_shortfall > f.rule_service_at_shortfall
     ):
         problems.append("the plans no longer separate only at the largest demand surprise (item 3)")
+    if math.isnan(f.last_full_service_error):
+        problems.append("the stress test grid has no case where every plan met demand (item 3)")
     largest = max(f.effects, key=lambda name: abs(f.effects[name]))
     if largest != "price":
         problems.append(f"the largest revenue effect is now {largest}, not price (recommendation 4)")
+    if not f.effects["price"] > 0:
+        problems.append("the price effect no longer pushes revenue up (recommendation 4)")
     if not abs(f.revenue_gap) / f.forecast_revenue <= CLOSE_TO_FORECAST_SHARE:
         problems.append("revenue is no longer within 2% of the forecast (item 4)")
     if problems:
@@ -181,8 +200,8 @@ def business_summary(tables: ReportingTables, results_dir: Path = RESULTS_DIR) -
 **The question.** A gas utility must decide months ahead how much gas to buy, and whether to
 reserve emergency supply for the coldest weeks, without knowing the weather. This analysis asks
 how well demand can be forecast, what the best purchasing plan looks like, and why revenue ends
-up different from the forecast. It covers three years of Massachusetts gas deliveries to homes
-and businesses (September 2023 to August 2026).
+up different from the forecast. It covers {f.years_text} years of Massachusetts gas deliveries to
+homes and businesses ({f.first_month:%B %Y} to {f.last_month:%B %Y}).
 
 **What we found**
 
@@ -192,8 +211,9 @@ and businesses (September 2023 to August 2026).
    actually happened it missed by {f.actual_weather_miss:.1f}%. Knowing the weather removes
    {f.weather_share_of_miss:.0%} of the miss, and the rest is the forecast's own error.
 2. *A smarter purchase plan saves little, and the saving is not certain.* The optimised plan cost
-   ${f.optimised_cost:,.1f}M over three years against ${f.rule_cost:,.1f}M for the usual rule
-   (buy the forecast plus 5% and reserve emergency supply every winter), saving
+   ${f.optimised_cost:,.1f}M over {f.years_text} years against ${f.rule_cost:,.1f}M for the usual
+   rule (buy the forecast plus {RULE_RESERVE_FRACTION:.0%} and reserve emergency supply every
+   winter), saving
    {_signed_money(f.saving)}, or {saving_share:.1f}%. If storage must be refilled to the same
    level every year, the optimised plan costs {_signed_money(f.strict_saving)} more instead.
 3. *Past winters did not separate the plans. A large demand surprise did.* Tested against
@@ -222,5 +242,5 @@ and businesses (September 2023 to August 2026).
 
 **What to keep in mind.** One weather station stands in for the whole state. The sizes of the
 pipeline, storage and emergency supply, their fees and penalties, and the budget price are
-assumptions, not measurements. Three years of data is a small sample.
+assumptions, not measurements. {f.years_text.capitalize()} years of data is a small sample.
 """

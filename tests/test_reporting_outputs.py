@@ -172,11 +172,15 @@ def test_the_summary_refuses_to_publish_when_a_recommendation_is_no_longer_suppo
         findings, optimised_short_scenarios=findings.rule_short_scenarios + 3
     )
     saving_not_small = replace(findings, optimised_cost=findings.rule_cost * 0.9)
+    price_pulls_revenue_down = replace(findings, effects={**findings.effects, "price": -742.5})
+    no_case_met_in_full = replace(findings, last_full_service_error=float("nan"))
 
     for changed in (
         flipped_saving,
         forecast_wins,
         price_not_largest,
+        price_pulls_revenue_down,
+        no_case_met_in_full,
         plans_differ_in_past_winters,
         saving_not_small,
     ):

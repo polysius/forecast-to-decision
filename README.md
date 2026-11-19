@@ -126,8 +126,8 @@ add the screenshot here. The repository ignores `*.pbix` files.
 **The question.** A gas utility must decide months ahead how much gas to buy, and whether to
 reserve emergency supply for the coldest weeks, without knowing the weather. This analysis asks
 how well demand can be forecast, what the best purchasing plan looks like, and why revenue ends
-up different from the forecast. It covers three years of Massachusetts gas deliveries to homes
-and businesses (September 2023 to August 2026).
+up different from the forecast. It covers three years of Massachusetts gas deliveries to
+homes and businesses (September 2023 to August 2026).
 
 **What we found**
 
@@ -137,8 +137,9 @@ and businesses (September 2023 to August 2026).
    actually happened it missed by 9.3%. Knowing the weather removes
    30% of the miss, and the rest is the forecast's own error.
 2. *A smarter purchase plan saves little, and the saving is not certain.* The optimised plan cost
-   $5,053.3M over three years against $5,077.4M for the usual rule
-   (buy the forecast plus 5% and reserve emergency supply every winter), saving
+   $5,053.3M over three years against $5,077.4M for the usual
+   rule (buy the forecast plus 5% and reserve emergency supply every
+   winter), saving
    $24.1M, or 0.5%. If storage must be refilled to the same
    level every year, the optimised plan costs $8.9M more instead.
 3. *Past winters did not separate the plans. A large demand surprise did.* Tested against
