@@ -27,6 +27,7 @@ from forecast_to_decision.optimisation import (
     solve_supply_plan,
 )
 from forecast_to_decision.optimisation_plots import plot_nominations, plot_sensitivity
+from forecast_to_decision.report import markdown_table
 from forecast_to_decision.scenarios import fit_sectors, plan_year_months, weather_year_scenarios
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,20 +221,6 @@ def commitments_table(years: list[PlanYear]) -> pd.DataFrame:
             )
         )
     return pd.concat(frames, ignore_index=True)
-
-
-def markdown_table(frame: pd.DataFrame, columns: dict[str, tuple[str, str]]) -> str:
-    """Render a DataFrame as a Markdown table.
-
-    `columns` lists, in display order, each column with its header text and format spec.
-    """
-    header = "| " + " | ".join(title for title, _ in columns.values()) + " |"
-    divider = "|" + "---|" * len(columns)
-    rows = [
-        "| " + " | ".join(format(row[name], spec) for name, (_, spec) in columns.items()) + " |"
-        for _, row in frame.iterrows()
-    ]
-    return "\n".join([header, divider, *rows])
 
 
 TOTALS_COLUMNS = {
