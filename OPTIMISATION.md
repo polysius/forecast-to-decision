@@ -37,17 +37,19 @@ v[s,t] = v[s,t-1] + i[s,t] - w[s,t],  v[s,0] = startFraction * storageCap
 g[s,t] <= peakingCap * y[t]                                     peaking only if contracted
 ```
 
-**Objective: minimise expected total cost, in $M.**
+**Objective: minimise expected total cost, in $M.** A volume in MMcf times a price in $/Mcf is
+thousands of dollars, so `k = 1/1000` converts those terms to $M. The standby fee is already in $M.
 
 ```
-sum_t p[t] x[t] + standbyFee * sum_t y[t]
-+ (1/S) * sum_s sum_t ( injFee*i + wdFee*w + peakMultiple*p[t]*g
+k * sum_t p[t] x[t] + standbyFee * sum_t y[t]
++ (k/S) * sum_s sum_t ( injFee*i + wdFee*w + peakMultiple*p[t]*g
                         + penalty*u - resaleFraction*p[t]*r )
-- avgPrice * (1/S) * sum_s v[s,12]
+- (k/S) * avgPrice * sum_s v[s,12]
 ```
 
 The last term values the gas left in storage at the plan year's average price. Without it the
-model would empty storage for free at the end of the year.
+model would empty storage for free at the end of the year. The robustness section below replaces
+it with a requirement that `v[s,12]` is at least the starting inventory.
 
 Because `y` is binary, this is a mixed integer program. It is solved as one deterministic
 equivalent problem with SCIP through OR-Tools. The same model, with `x` and `y` fixed and a
@@ -140,7 +142,9 @@ nearly the same weather risk.
 
 Both plans are made on the forecast. Realised demand is then the forecast times (1 + error)
 in every month, averaged over the three plan years. The hindsight column re-plans for each
-error, so the gap to it is the cost of having planned on the wrong forecast.
+error. The gap to it is not only the cost of a wrong forecast: at 0% error the rule of thumb
+and the optimised plan are still above it, because a plan made for the average case is not the
+best plan for any single case.
 
 Cost per plan year, $M:
 
@@ -168,6 +172,21 @@ Share of demand served, %:
 
 At +15% the rule of thumb costs $2540.1M and serves 97.77% of demand, the optimised plan $2385.2M and 98.59%, and perfect hindsight $2215.3M. At -15% the rule of thumb costs $1567.8M and serves 100.00% of demand, the optimised plan $1574.1M and 100.00%, and perfect hindsight $1523.6M.
 
+## Robustness to the end-of-year storage rule
+
+The main results let a plan end the year with less gas in storage than it began with, and value
+the leftover gas at the plan year's average price. A stricter rule requires storage to end
+each year at least as full as it began, with leftover gas earning nothing. The optimised plan
+is solved again under that rule. Totals over the three plan years, on actual demand:
+
+| Plan | Cost ($M) | Demand served (%) | Months with shortfall | Peaking gas used (MMcf) |
+|---|---|---|---|---|
+| Rule of thumb | 5824.8 | 100.00 | 0 | 99 |
+| Optimised plan | 5833.6 | 100.00 | 0 | 99 |
+| Perfect hindsight | 5754.9 | 100.00 | 0 | 99 |
+
+Under this rule the three plans cost $5824.8M (rule of thumb), $5833.6M (optimised) and $5754.9M (perfect hindsight), so the optimised plan is $8.9M more expensive than the rule of thumb. The size and even the sign of the saving depend on how leftover storage gas is treated.
+
 ![Sensitivity to forecast error](docs/figures/m2_sensitivity.png)
 
 ## Limitations
@@ -176,10 +195,12 @@ At +15% the rule of thumb costs $2540.1M and serves 97.77% of demand, the optimi
   demand or a different standby fee can change which plan wins.
 * Pipeline gas is priced at the month's realised citygate price, so price risk is out of scope.
   Only demand is uncertain.
-* In this EIA series the Massachusetts citygate price is higher in summer than in winter, in
-  every period since 1989. The plans respond to that shape, so storage is cheap to draw down in
-  summer and the usual summer-fill logic does not apply. A different price series would change
-  the storage behaviour.
+* In this EIA series the Massachusetts citygate price is usually at or above its winter level in
+  summer. Averaged over 1989 to 1999, 2000 to 2012, 2013 to 2023 and 2024 to 2026, summer is
+  higher in every period, although not in every single year. The plans respond to that price
+  shape, so the usual buy cheap in summer and store logic is weak here. A different price series
+  would change the storage behaviour.
+* The saving depends on the end-of-year storage rule (see the robustness section above).
 * The EIA citygate price is missing for 2026-03. It was filled by linear interpolation between the neighbouring months.
 * The scenarios hold the weather of a past year fixed across the whole plan year and ignore the
   M1 model's own error, which is why the error sensitivity above is reported separately.

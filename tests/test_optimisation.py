@@ -149,6 +149,44 @@ def test_stochastic_plan_covers_a_likely_cold_scenario():
     assert plan.commitments.peaking_active[2]
 
 
+def test_cyclic_storage_rule_forces_storage_to_end_as_full_as_it_began():
+    prices = np.array([10.0, 10.0, 10.0, 10.0])
+    demand = np.array([50.0, 50.0, 50.0, 50.0])
+    assumptions = make_assumptions(
+        storage_capacity=100.0,
+        storage_start_fraction=0.5,
+        storage_withdrawal_limit_fraction=1.0,
+        storage_injection_limit_fraction=1.0,
+        require_cyclic_storage=True,
+    )
+
+    outcome = solve_supply_plan(demand, prices, assumptions).outcomes[0]
+
+    # Anything withdrawn must be put back, so buying more than demand to refill costs more.
+    assert outcome.storage_withdrawn_mmcf == pytest.approx(0, abs=1e-6)
+    assert outcome.total_cost_musd == pytest.approx(demand.sum() * 10 / 1000)
+
+
+def test_fixed_nominations_outside_the_pipeline_limits_are_rejected():
+    demand = np.array([60.0, 60.0, 60.0, 60.0])
+    too_much = Commitments(np.full(4, 500.0), np.zeros(4, dtype=bool))
+    assumptions = make_assumptions(pipeline_min_take_fraction=0.2)
+    too_little = Commitments(np.full(4, 5.0), np.zeros(4, dtype=bool))
+
+    with pytest.raises(ValueError, match="between"):
+        evaluate_commitments(too_much, demand, PRICES, assumptions)
+    with pytest.raises(ValueError, match="between"):
+        evaluate_commitments(too_little, demand, PRICES, assumptions)
+
+
+def test_zero_demand_counts_as_fully_served():
+    demand = np.zeros(4)
+
+    outcome = solve_supply_plan(demand, PRICES, make_assumptions()).outcomes[0]
+
+    assert outcome.served_fraction == 1.0
+
+
 def test_assumptions_scale_with_expected_demand():
     scenarios = np.array([[10.0, 40.0, 20.0], [10.0, 60.0, 20.0]])
 

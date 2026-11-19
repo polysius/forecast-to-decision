@@ -52,6 +52,10 @@ class SupplyAssumptions:
     peaking_standby_fee_musd: float = 2.0  # per contracted month
     unserved_penalty: float = 60.0  # $/Mcf, the cost of failing to deliver
     surplus_resale_fraction: float = 0.5  # of the citygate price
+    # False: leftover storage gas earns the average price, so a plan may end the year
+    # emptier than it began. True: storage must end at least as full as it began and
+    # leftover gas earns nothing.
+    require_cyclic_storage: bool = False
 
     @property
     def pipeline_min_take(self) -> float:
@@ -154,6 +158,13 @@ def _add_recourse(
         solver.Add(v.inventory[t] == previous + v.inject[t] - v.withdraw[t])
         solver.Add(v.peaking[t] <= a.peaking_capacity * peaking_active[t])
 
+    final_inventory = v.inventory[len(demand) - 1]
+    if a.require_cyclic_storage:
+        solver.Add(final_inventory >= start_inventory)
+        terminal_credit = 0 * final_inventory
+    else:
+        terminal_credit = terminal_value * final_inventory
+
     cost = sum(
         a.storage_injection_fee * v.inject[t]
         + a.storage_withdrawal_fee * v.withdraw[t]
@@ -161,7 +172,7 @@ def _add_recourse(
         + a.unserved_penalty * v.unserved[t]
         - a.surplus_resale_fraction * prices[t] * v.surplus[t]
         for t in months
-    ) - terminal_value * v.inventory[len(demand) - 1]
+    ) - terminal_credit
     return v, cost * MMCF_PRICE_TO_MUSD
 
 
@@ -186,6 +197,7 @@ def solve_supply_plan(
         ]
         peaking_active = [solver.BoolVar("") for _ in months]
     else:
+        _require_feasible_commitments(fixed, assumptions)
         # Fixed commitments are constants, which leaves a plain linear program.
         nominations = [float(volume) for volume in fixed.nominations]
         peaking_active = [int(active) for active in fixed.peaking_active]
@@ -225,12 +237,29 @@ def solve_supply_plan(
     return SolvedPlan(chosen, expected_cost, outcomes)
 
 
+def _require_feasible_commitments(
+    commitments: Commitments, assumptions: SupplyAssumptions
+) -> None:
+    """Fixed nominations must respect the pipeline's minimum take and capacity."""
+    tolerance = 1e-6
+    below_minimum = commitments.nominations < assumptions.pipeline_min_take - tolerance
+    above_capacity = commitments.nominations > assumptions.pipeline_capacity + tolerance
+    if below_minimum.any() or above_capacity.any():
+        raise ValueError(
+            "Nominations must lie between the pipeline minimum take "
+            f"({assumptions.pipeline_min_take:.0f}) and capacity "
+            f"({assumptions.pipeline_capacity:.0f}) MMcf"
+        )
+
+
 def _read_outcome(variables: _RecourseVariables, total_cost: float, demand: np.ndarray) -> Outcome:
     unserved = np.array([u.solution_value() for u in variables.unserved])
+    total_demand = demand.sum()
+    served_fraction = 1.0 if total_demand == 0 else 1 - unserved.sum() / total_demand
     return Outcome(
         total_cost_musd=total_cost,
         unserved_mmcf=float(unserved.sum()),
-        served_fraction=float(1 - unserved.sum() / demand.sum()),
+        served_fraction=float(served_fraction),
         shortfall_months=int((unserved > SHORTFALL_TOLERANCE_MMCF).sum()),
         peaking_mmcf=float(sum(p.solution_value() for p in variables.peaking)),
         storage_withdrawn_mmcf=float(sum(w.solution_value() for w in variables.withdraw)),

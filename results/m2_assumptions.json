@@ -12,7 +12,8 @@
     "peaking_price_multiple": 2.0,
     "peaking_standby_fee_musd": 2.0,
     "unserved_penalty": 60.0,
-    "surplus_resale_fraction": 0.5
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
   },
   "2024-09 to 2025-08": {
     "pipeline_capacity": 32533.927326399993,
@@ -27,7 +28,8 @@
     "peaking_price_multiple": 2.0,
     "peaking_standby_fee_musd": 2.0,
     "unserved_penalty": 60.0,
-    "surplus_resale_fraction": 0.5
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
   },
   "2025-09 to 2026-08": {
     "pipeline_capacity": 32533.927326399993,
@@ -42,6 +44,7 @@
     "peaking_price_multiple": 2.0,
     "peaking_standby_fee_musd": 2.0,
     "unserved_penalty": 60.0,
-    "surplus_resale_fraction": 0.5
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
   }
 }

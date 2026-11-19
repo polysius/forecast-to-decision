@@ -5,7 +5,7 @@ computed here. Run from the repo root:  python scripts/run_m2.py
 """
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -154,6 +154,26 @@ def weather_scenario_results(years: list[PlanYear]) -> pd.DataFrame:
                     "scenarios": len(solved.outcomes),
                 }
             )
+    return pd.DataFrame(rows)
+
+
+def strict_storage_results(years: list[PlanYear]) -> pd.DataFrame:
+    """Repeat the comparison when storage must end each year as full as it began.
+
+    The optimised plan is solved again under this rule, because the rule changes
+    what the best plan is. The rule of thumb keeps its nominations.
+    """
+    rows = []
+    for year in years:
+        strict = replace(year.assumptions, require_cyclic_storage=True)
+        optimised = solve_supply_plan(year.scenarios, year.prices, strict).commitments
+        outcomes = {
+            RULE: evaluate_commitments(year.rule, year.actual, year.prices, strict),
+            OPTIMISED: evaluate_commitments(optimised, year.actual, year.prices, strict),
+            HINDSIGHT: perfect_hindsight_outcome(year.actual, year.prices, strict),
+        }
+        for plan, outcome in outcomes.items():
+            rows.append(outcome_row(year.label, plan, outcome))
     return pd.DataFrame(rows)
 
 
@@ -329,17 +349,19 @@ v[s,t] = v[s,t-1] + i[s,t] - w[s,t],  v[s,0] = startFraction * storageCap
 g[s,t] <= peakingCap * y[t]                                     peaking only if contracted
 ```
 
-**Objective: minimise expected total cost, in $M.**
+**Objective: minimise expected total cost, in $M.** A volume in MMcf times a price in $/Mcf is
+thousands of dollars, so `k = 1/1000` converts those terms to $M. The standby fee is already in $M.
 
 ```
-sum_t p[t] x[t] + standbyFee * sum_t y[t]
-+ (1/S) * sum_s sum_t ( injFee*i + wdFee*w + peakMultiple*p[t]*g
+k * sum_t p[t] x[t] + standbyFee * sum_t y[t]
++ (k/S) * sum_s sum_t ( injFee*i + wdFee*w + peakMultiple*p[t]*g
                         + penalty*u - resaleFraction*p[t]*r )
-- avgPrice * (1/S) * sum_s v[s,12]
+- (k/S) * avgPrice * sum_s v[s,12]
 ```
 
 The last term values the gas left in storage at the plan year's average price. Without it the
-model would empty storage for free at the end of the year.
+model would empty storage for free at the end of the year. The robustness section below replaces
+it with a requirement that `v[s,12]` is at least the starting inventory.
 
 Because `y` is binary, this is a mixed integer program. It is solved as one deterministic
 equivalent problem with SCIP through OR-Tools. The same model, with `x` and `y` fixed and a
@@ -371,6 +393,21 @@ def verdict(actual_totals: pd.DataFrame) -> str:
     return sentence
 
 
+def strict_storage_verdict(strict_totals: pd.DataFrame) -> str:
+    cost = strict_totals.set_index("plan")["cost_musd"]
+    saving = cost[RULE] - cost[OPTIMISED]
+    if saving > 0:
+        outcome = f"the optimised plan is ${saving:.1f}M cheaper than the rule of thumb"
+    else:
+        outcome = f"the optimised plan is ${-saving:.1f}M more expensive than the rule of thumb"
+    return (
+        f"Under this rule the three plans cost ${cost[RULE]:.1f}M (rule of thumb), "
+        f"${cost[OPTIMISED]:.1f}M (optimised) and ${cost[HINDSIGHT]:.1f}M (perfect hindsight), so "
+        f"{outcome}. The size and even the sign of the saving depend on how leftover storage gas "
+        "is treated."
+    )
+
+
 def sensitivity_verdict(sensitivity: pd.DataFrame) -> str:
     """Say where the plans differ most: the largest demand surprise in each direction."""
     cost = sensitivity.pivot(index="forecast_error_percent", columns="plan", values="cost_musd")
@@ -394,6 +431,7 @@ def write_document(
     totals: pd.DataFrame,
     scenarios: pd.DataFrame,
     sensitivity: pd.DataFrame,
+    strict_totals: pd.DataFrame,
     imputed_price_months: list[str],
 ) -> None:
     imputed_note = (
@@ -471,7 +509,9 @@ nearly the same weather risk.
 
 Both plans are made on the forecast. Realised demand is then the forecast times (1 + error)
 in every month, averaged over the three plan years. The hindsight column re-plans for each
-error, so the gap to it is the cost of having planned on the wrong forecast.
+error. The gap to it is not only the cost of a wrong forecast: at 0% error the rule of thumb
+and the optimised plan are still above it, because a plan made for the average case is not the
+best plan for any single case.
 
 Cost per plan year, $M:
 
@@ -483,6 +523,17 @@ Share of demand served, %:
 
 {sensitivity_verdict(sensitivity)}
 
+## Robustness to the end-of-year storage rule
+
+The main results let a plan end the year with less gas in storage than it began with, and value
+the leftover gas at the plan year's average price. A stricter rule requires storage to end
+each year at least as full as it began, with leftover gas earning nothing. The optimised plan
+is solved again under that rule. Totals over the three plan years, on actual demand:
+
+{markdown_table(strict_totals, TOTALS_COLUMNS)}
+
+{strict_storage_verdict(strict_totals)}
+
 ![Sensitivity to forecast error](docs/figures/m2_sensitivity.png)
 
 ## Limitations
@@ -491,10 +542,12 @@ Share of demand served, %:
   demand or a different standby fee can change which plan wins.
 * Pipeline gas is priced at the month's realised citygate price, so price risk is out of scope.
   Only demand is uncertain.
-* In this EIA series the Massachusetts citygate price is higher in summer than in winter, in
-  every period since 1989. The plans respond to that shape, so storage is cheap to draw down in
-  summer and the usual summer-fill logic does not apply. A different price series would change
-  the storage behaviour.
+* In this EIA series the Massachusetts citygate price is usually at or above its winter level in
+  summer. Averaged over 1989 to 1999, 2000 to 2012, 2013 to 2023 and 2024 to 2026, summer is
+  higher in every period, although not in every single year. The plans respond to that price
+  shape, so the usual buy cheap in summer and store logic is weak here. A different price series
+  would change the storage behaviour.
+* The saving depends on the end-of-year storage rule (see the robustness section above).
 {imputed_note}
 * The scenarios hold the weather of a past year fixed across the whole plan year and ignore the
   M1 model's own error, which is why the error sensitivity above is reported separately.
@@ -515,6 +568,8 @@ def main() -> None:
     totals = totals_over_years(actual, sum(year.actual.sum() for year in years))
     scenarios = weather_scenario_results(years)
     sensitivity = sensitivity_results(years)
+    strict = strict_storage_results(years)
+    strict_totals = totals_over_years(strict, sum(year.actual.sum() for year in years))
     commitments = commitments_table(years)
 
     actual.to_csv(RESULTS_DIR / "m2_plan_comparison.csv", index=False, float_format="%.3f")
@@ -526,7 +581,8 @@ def main() -> None:
     )
     plot_nominations(commitments, FIGURES_DIR / "m2_nominations.png")
     plot_sensitivity(sensitivity, FIGURES_DIR / "m2_sensitivity.png")
-    write_document(years, actual, totals, scenarios, sensitivity, imputed_price_months)
+    strict.to_csv(RESULTS_DIR / "m2_strict_storage.csv", index=False, float_format="%.3f")
+    write_document(years, actual, totals, scenarios, sensitivity, strict_totals, imputed_price_months)
     print(totals.round(2).to_string(index=False))
 
 

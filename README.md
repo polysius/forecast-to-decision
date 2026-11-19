@@ -68,6 +68,12 @@ uniform. The two plans differ most when demand surprises on the high side. If re
 15% above the forecast, the rule of thumb costs $2,540M per year and serves 97.8% of demand,
 while the optimised plan costs $2,385M and serves 98.6%.
 
+The saving depends on how leftover storage gas is treated. The results above value it at the
+average price. If storage must instead end each year as full as it began, the optimised plan
+costs $5,834M against $5,825M for the rule of thumb, so it is $9M more expensive. The plan is a
+sound way to hedge demand risk, but this data does not show that it saves money in every
+setting.
+
 ## Run it
 
 ```
