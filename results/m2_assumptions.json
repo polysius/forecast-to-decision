@@ -1,0 +1,50 @@
+{
+  "2023-09 to 2024-08": {
+    "pipeline_capacity": 32533.927326399993,
+    "storage_capacity": 28288.24585689541,
+    "peaking_capacity": 3253.392732639999,
+    "pipeline_min_take_fraction": 0.3,
+    "storage_start_fraction": 0.8,
+    "storage_injection_limit_fraction": 0.25,
+    "storage_withdrawal_limit_fraction": 0.35,
+    "storage_injection_fee": 0.15,
+    "storage_withdrawal_fee": 0.1,
+    "peaking_price_multiple": 2.0,
+    "peaking_standby_fee_musd": 2.0,
+    "unserved_penalty": 60.0,
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
+  },
+  "2024-09 to 2025-08": {
+    "pipeline_capacity": 32533.927326399993,
+    "storage_capacity": 28311.16060159089,
+    "peaking_capacity": 3253.392732639999,
+    "pipeline_min_take_fraction": 0.3,
+    "storage_start_fraction": 0.8,
+    "storage_injection_limit_fraction": 0.25,
+    "storage_withdrawal_limit_fraction": 0.35,
+    "storage_injection_fee": 0.15,
+    "storage_withdrawal_fee": 0.1,
+    "peaking_price_multiple": 2.0,
+    "peaking_standby_fee_musd": 2.0,
+    "unserved_penalty": 60.0,
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
+  },
+  "2025-09 to 2026-08": {
+    "pipeline_capacity": 32533.927326399993,
+    "storage_capacity": 28311.16060159089,
+    "peaking_capacity": 3253.392732639999,
+    "pipeline_min_take_fraction": 0.3,
+    "storage_start_fraction": 0.8,
+    "storage_injection_limit_fraction": 0.25,
+    "storage_withdrawal_limit_fraction": 0.35,
+    "storage_injection_fee": 0.15,
+    "storage_withdrawal_fee": 0.1,
+    "peaking_price_multiple": 2.0,
+    "peaking_standby_fee_musd": 2.0,
+    "unserved_penalty": 60.0,
+    "surplus_resale_fraction": 0.5,
+    "require_cyclic_storage": false
+  }
+}

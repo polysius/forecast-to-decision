@@ -1,0 +1,22 @@
+forecast_error_percent,plan,cost_musd,served_percent,shortfall_months
+-15.000,Rule of thumb,1567.815,100.000,0.000
+-15.000,Optimised plan,1574.060,100.000,0.000
+-15.000,Perfect hindsight,1523.551,100.000,0.000
+-10.000,Rule of thumb,1636.124,100.000,0.000
+-10.000,Optimised plan,1631.214,100.000,0.000
+-10.000,Perfect hindsight,1610.066,100.000,0.000
+-5.000,Rule of thumb,1723.466,100.000,0.000
+-5.000,Optimised plan,1709.272,100.000,0.000
+-5.000,Perfect hindsight,1698.704,100.000,0.000
+0.000,Rule of thumb,1834.663,100.000,0.000
+0.000,Optimised plan,1802.129,100.000,0.000
+0.000,Perfect hindsight,1796.489,100.000,0.000
+5.000,Rule of thumb,1961.038,100.000,0.000
+5.000,Optimised plan,1923.793,100.000,0.000
+5.000,Perfect hindsight,1911.139,100.000,0.000
+10.000,Rule of thumb,2102.503,100.000,0.000
+10.000,Optimised plan,2059.621,100.000,0.000
+10.000,Perfect hindsight,2037.213,100.000,0.000
+15.000,Rule of thumb,2540.125,97.775,1.667
+15.000,Optimised plan,2385.230,98.589,1.333
+15.000,Perfect hindsight,2215.288,99.604,1.000
