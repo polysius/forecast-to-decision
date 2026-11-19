@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from forecast_to_decision.data import SECTORS, load_monthly_gas
+from forecast_to_decision.datasets import load_m1_volumes, load_price_history
 from forecast_to_decision.report import markdown_table
 from forecast_to_decision.variance import (
     COMPONENTS,
@@ -16,7 +16,6 @@ from forecast_to_decision.variance import (
     budget_prices,
     decompose_revenue_variance,
     frozen_budget_prices,
-    sector_frame,
     sum_by_period,
     volume_variance,
 )
@@ -47,31 +46,6 @@ VOLUME_COLUMNS = {
     "weather_mmcf": ("Explained by weather", "+,.0f"),
     "other_mmcf": ("Not explained by weather", "+,.0f"),
 }
-
-
-def load_volumes() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Forecast, weather adjusted forecast, and actual deliveries by month and sector."""
-    holdouts = {
-        sector: pd.read_csv(RESULTS_DIR / f"m1_{sector}_holdout.csv", index_col=0, parse_dates=True)
-        for sector in SECTORS
-    }
-
-    def column(name: str) -> pd.DataFrame:
-        return sector_frame({sector: holdouts[sector][name] for sector in SECTORS})
-
-    return (
-        column("regression_normal_weather_mmcf"),
-        column("regression_actual_weather_mmcf"),
-        column("actual_mmcf"),
-    )
-
-
-def load_price_history() -> pd.DataFrame:
-    """Residential and commercial prices ($/Mcf) for every month in the EIA series."""
-    gas = load_monthly_gas()
-    return sector_frame(
-        {"residential": gas["residential_price"], "commercial": gas["commercial_price"]}
-    )
 
 
 def budget_rule_rows(rolling: pd.DataFrame, frozen: pd.DataFrame) -> pd.DataFrame:
@@ -196,7 +170,7 @@ Totals over all {len(periods)} periods, in $M:
 
 def main() -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    forecast, weather_adjusted, actual = load_volumes()
+    forecast, weather_adjusted, actual = load_m1_volumes()
     history = load_price_history()
     actual_price = history.loc[forecast.index]
     rolling_budget = budget_prices(history).loc[forecast.index]

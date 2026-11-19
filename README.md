@@ -11,7 +11,7 @@ gas utility do, and how much does the forecast error cost? It is built in four m
 | M1 | Interpretable regression forecast | Done, see [STATS.md](STATS.md) |
 | M2 | Supply plan optimisation (MIP) | Done, see [OPTIMISATION.md](OPTIMISATION.md) |
 | M3 | Forecast-vs-actual variance analysis | Done, see [VARIANCE.md](VARIANCE.md) |
-| M4 | Excel workbook, Power BI model, business summary | Not started |
+| M4 | Excel workbook, Power BI model, business summary | Workbook, data model and summary done. The Power BI report is for the owner to build, see [powerbi/POWERBI_GUIDE.md](powerbi/POWERBI_GUIDE.md) |
 
 ## Use case
 
@@ -94,6 +94,79 @@ earlier. Freezing the price at what was known when the forecast was made gives a
 $13,816.9M and a gap of $221.3M, with price adding $647.0M. The size of the price effect and of
 the total gap both depend on this rule.
 
+## M4: reporting
+
+The results are packaged for people who do not read code.
+
+**Excel workbook.** [reports/forecast_to_decision.xlsx](reports/forecast_to_decision.xlsx) holds the
+36 months by sector, the variance table, two real PivotTables (revenue by plan year and sector,
+variance effects by period), a month lookup built on INDEX and MATCH, and a scenario sheet. The
+scenario sheet changes demand and prices with formulas, and reads supply plan costs from the
+optimisation runs by interpolating between the tested forecast errors. It does not re-run the
+optimisation. The PivotTables are made by Excel itself, so rebuilding the workbook needs Excel for
+Windows.
+
+**Power BI model.** [powerbi/](powerbi/) holds the star schema data files, the DAX measures in
+`measures.dax`, and a guide with the relationships, a suggested page layout and check values. The
+measures have not been run in Power BI, so use the check values in the guide to confirm them.
+
+**Business summary.** One page for a non-technical reader, below. It is generated from the results,
+and it stops with an error if a recommendation stops being supported by the numbers.
+
+### Dashboard
+
+The dashboard has not been built yet. Build it from the guide, save the report as
+`powerbi/forecast_to_decision.pbix`, and save a screenshot as `docs/figures/dashboard.png`. Then
+add the screenshot here. The repository ignores `*.pbix` files.
+
+## Business summary
+
+<!-- business-summary:start -->
+**The question.** A gas utility must decide months ahead how much gas to buy, and whether to
+reserve emergency supply for the coldest weeks, without knowing the weather. This analysis asks
+how well demand can be forecast, what the best purchasing plan looks like, and why revenue ends
+up different from the forecast. It covers three years of Massachusetts gas deliveries to homes
+and businesses (September 2023 to August 2026), with Boston weather and published prices.
+
+**What we found**
+
+1. *The forecast is only as good as the weather guess.* Assuming normal weather, the forecast
+   missed monthly demand by 13.3% on average. That is no better than
+   assuming each month repeats the same month last year (10.0%). Given the
+   weather that actually happened, the miss falls to 9.3%.
+2. *A smarter purchase plan saves little, and the saving is not certain.* The optimised plan cost
+   $5,053.3M over the three years against $5,077.4M for the usual
+   rule of buying the forecast plus 5% and reserving emergency supply every winter. That saves
+   $24.1M, or 0.5%. If storage must be refilled to the same
+   level every year, the same comparison turns around and the optimised plan costs
+   $8.9M more.
+3. *The plans differ most when demand surprises.* In every case tested up to
+   10% more demand than forecast, every plan met all of it. At
+   15% more, the usual rule delivered 97.8% of
+   demand and the optimised plan 98.6%.
+4. *Revenue landed close to the forecast, but only because large effects cancelled.* Actual
+   revenue was $129.3M below the
+   $13,724.9M forecast, a gap of 0.9%. Compared with the forecast,
+   prices added $742.5M, volume took off $654.5M,
+   weather took off $275.1M and the mix of home and business customers
+   added $57.7M.
+
+**What we recommend**
+
+* Plan against a range of possible winters, not one forecast number. The weather is what the
+  forecast could not know.
+* Keep reserve capacity for a cold surprise of the size tested. The optimised plan did better
+  exactly there.
+* Weigh the purchase plan mainly on how it copes with a cold surprise. Its cost saving is small
+  and depends on how storage is managed.
+* Check the price assumptions in the budget first. Price was the largest source of the gap
+  between forecast and actual revenue.
+
+**What to keep in mind.** One weather station stands in for the whole state. The sizes of the
+pipeline, storage and emergency supply, and their fees and penalties, are assumptions, not
+measurements. The budget price is an assumption too. Three years of data is a small sample.
+<!-- business-summary:end -->
+
 ## Run it
 
 ```
@@ -102,18 +175,25 @@ python scripts/fetch_data.py   # optional, the extracts are committed under data
 python scripts/run_m1.py       # rewrites STATS.md, docs/figures and results/
 python scripts/run_m2.py       # needs the M1 results; rewrites OPTIMISATION.md
 python scripts/run_m3.py       # needs the M1 results; rewrites VARIANCE.md
+python scripts/run_m4.py       # needs M1 to M3; workbook (Excel for Windows), Power BI files, summary
 pytest
 ```
+
+Use `python scripts/run_m4.py --skip-workbook` on a machine without Excel.
 
 ## Layout
 
 ```
 data/raw/                 committed extracts of the EIA and NOAA data
 src/forecast_to_decision/ data loading, model, diagnostics, scenarios, supply plan optimiser,
-                          variance decomposition
-scripts/                  fetch_data.py, run_m1.py, run_m2.py, run_m3.py
+                          variance decomposition, report tables, workbook, Power BI export,
+                          business summary
+scripts/                  fetch_data.py, run_m1.py to run_m4.py, add_pivots.ps1
 results/                  M1 holdout forecasts and specs, M2 plan comparison and sensitivity,
                           M3 variance tables
+reports/                  the Excel workbook
+powerbi/                  data files, DAX measures and the build guide
+BUSINESS_SUMMARY.md       the one page summary for a non-technical reader
 docs/figures/             diagnostic and forecast plots
 tests/                    unit tests that run offline
 ```

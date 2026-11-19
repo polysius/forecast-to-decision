@@ -1,0 +1,96 @@
+// DAX measures for the forecast-to-decision Power BI model.
+// Paste each measure into Power BI Desktop: Modeling > New measure, or use the DAX query view.
+// Each measure starts at the left margin with its name and an equals sign.
+// These have not been run in Power BI. The model guide lists check values to compare against.
+
+// ---- Revenue --------------------------------------------------------------------------
+
+Forecast Revenue ($M) =
+    SUM ( FactMonthlySector[forecast_revenue_musd] )
+
+Actual Revenue ($M) =
+    SUM ( FactMonthlySector[actual_revenue_musd] )
+
+Revenue Variance ($M) =
+    [Actual Revenue ($M)] - [Forecast Revenue ($M)]
+
+Revenue Variance % =
+    DIVIDE ( [Revenue Variance ($M)], [Forecast Revenue ($M)] )
+
+// ---- Variance effects (positive means actual is above forecast) -----------------------
+
+Weather Effect ($M) =
+    SUM ( FactVariance[weather_musd] )
+
+Volume Effect ($M) =
+    SUM ( FactVariance[volume_musd] )
+
+Mix Effect ($M) =
+    SUM ( FactVariance[mix_musd] )
+
+Price Effect ($M) =
+    SUM ( FactVariance[price_musd] )
+
+Explained Variance ($M) =
+    [Weather Effect ($M)] + [Volume Effect ($M)] + [Mix Effect ($M)] + [Price Effect ($M)]
+
+Variance Check ($M) =
+    [Revenue Variance ($M)] - [Explained Variance ($M)]
+
+// ---- Volume ---------------------------------------------------------------------------
+
+Forecast Volume (MMcf) =
+    SUM ( FactMonthlySector[forecast_mmcf] )
+
+Weather Adjusted Forecast Volume (MMcf) =
+    SUM ( FactMonthlySector[weather_adjusted_forecast_mmcf] )
+
+Actual Volume (MMcf) =
+    SUM ( FactMonthlySector[actual_mmcf] )
+
+Volume Error % =
+    DIVIDE ( [Actual Volume (MMcf)] - [Forecast Volume (MMcf)], [Forecast Volume (MMcf)] )
+
+Average Monthly Miss % =
+    AVERAGEX (
+        FactMonthlySector,
+        DIVIDE (
+            ABS ( FactMonthlySector[actual_mmcf] - FactMonthlySector[forecast_mmcf] ),
+            FactMonthlySector[actual_mmcf]
+        )
+    )
+
+// ---- Supply plans ---------------------------------------------------------------------
+
+Plan Cost ($M) =
+    SUM ( FactPlanComparison[cost_musd] )
+
+Rule of Thumb Cost ($M) =
+    CALCULATE ( [Plan Cost ($M)], FactPlanComparison[plan] = "Rule of thumb" )
+
+Optimised Cost ($M) =
+    CALCULATE ( [Plan Cost ($M)], FactPlanComparison[plan] = "Optimised plan" )
+
+Hindsight Cost ($M) =
+    CALCULATE ( [Plan Cost ($M)], FactPlanComparison[plan] = "Perfect hindsight" )
+
+Optimised Saving vs Rule ($M) =
+    [Rule of Thumb Cost ($M)] - [Optimised Cost ($M)]
+
+Gap to Hindsight Closed % =
+    DIVIDE ( [Optimised Saving vs Rule ($M)], [Rule of Thumb Cost ($M)] - [Hindsight Cost ($M)] )
+
+Service Level % =
+    AVERAGE ( FactPlanComparison[served_percent] )
+
+Strict Storage Optimised Saving vs Rule ($M) =
+    CALCULATE ( SUM ( FactStrictStorage[cost_musd] ), FactStrictStorage[plan] = "Rule of thumb" )
+        - CALCULATE ( SUM ( FactStrictStorage[cost_musd] ), FactStrictStorage[plan] = "Optimised plan" )
+
+// ---- Forecast error sensitivity (use forecast_error_percent on the axis) --------------
+
+Sensitivity Cost ($M) =
+    AVERAGE ( FactSensitivity[cost_musd] )
+
+Sensitivity Service Level % =
+    AVERAGE ( FactSensitivity[served_percent] )
