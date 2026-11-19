@@ -19,7 +19,7 @@ from pathlib import Path
 from forecast_to_decision.business_summary import business_summary
 from forecast_to_decision.datasets import build_reporting_tables
 from forecast_to_decision.powerbi_export import guide_text, write_powerbi_data
-from forecast_to_decision.workbook import build_workbook
+from forecast_to_decision.workbook import build_workbook, scrub_workbook_metadata
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKBOOK_PATH = ROOT / "reports" / "forecast_to_decision.xlsx"
@@ -48,6 +48,7 @@ def write_workbook(tables) -> None:
             ],
             check=True,
         )  # fmt: skip
+    scrub_workbook_metadata(WORKBOOK_PATH)
 
 
 def update_readme_summary(summary: str) -> None:

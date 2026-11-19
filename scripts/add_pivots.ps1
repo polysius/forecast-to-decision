@@ -37,9 +37,15 @@ function Add-SumField($pivot, [string]$field, [string]$caption, [string]$format)
     $dataField.NumberFormat = $format
 }
 
+function Release-ComObject($object) {
+    if ($null -ne $object) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($object) }
+}
+
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
+$workbook = $null; $sheet = $null
+$revenueCache = $null; $revenue = $null; $varianceCache = $null; $variance = $null
 try {
     $workbook = $excel.Workbooks.Open($inputFull)
     $sheet = $workbook.Worksheets.Item("Pivots")
@@ -73,8 +79,11 @@ try {
     Write-Output "Saved $outputFull"
 }
 finally {
+    if ($null -ne $workbook) { try { $workbook.Close($false) } catch { } }
     $excel.Quit()
-    [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
+    foreach ($object in @($variance, $varianceCache, $revenue, $revenueCache, $sheet, $workbook, $excel)) {
+        Release-ComObject $object
+    }
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()
 }

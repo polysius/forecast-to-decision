@@ -1,6 +1,8 @@
 // DAX measures for the forecast-to-decision Power BI model.
-// Paste each measure into Power BI Desktop: Modeling > New measure, or use the DAX query view.
-// Each measure starts at the left margin with its name and an equals sign.
+// Paste each measure into Power BI Desktop with Modeling > New measure, one at a time.
+// Each measure starts at the left margin with its name and an equals sign. The DAX query view
+// needs a different form (DEFINE MEASURE), so do not paste these blocks there.
+// Measures ending in % return fractions: format them as Percentage.
 // These have not been run in Power BI. The model guide lists check values to compare against.
 
 // ---- Revenue --------------------------------------------------------------------------
@@ -51,13 +53,14 @@ Actual Volume (MMcf) =
 Volume Error % =
     DIVIDE ( [Actual Volume (MMcf)] - [Forecast Volume (MMcf)], [Forecast Volume (MMcf)] )
 
+// Misses are measured on total demand (both sectors together) for each month, then averaged.
 Average Monthly Miss % =
     AVERAGEX (
-        FactMonthlySector,
-        DIVIDE (
-            ABS ( FactMonthlySector[actual_mmcf] - FactMonthlySector[forecast_mmcf] ),
-            FactMonthlySector[actual_mmcf]
-        )
+        VALUES ( DimDate[month] ),
+        VAR ForecastVolume = CALCULATE ( SUM ( FactMonthlySector[forecast_mmcf] ) )
+        VAR ActualVolume = CALCULATE ( SUM ( FactMonthlySector[actual_mmcf] ) )
+        RETURN
+            DIVIDE ( ABS ( ActualVolume - ForecastVolume ), ActualVolume )
     )
 
 // ---- Supply plans ---------------------------------------------------------------------
@@ -81,7 +84,7 @@ Gap to Hindsight Closed % =
     DIVIDE ( [Optimised Saving vs Rule ($M)], [Rule of Thumb Cost ($M)] - [Hindsight Cost ($M)] )
 
 Service Level % =
-    AVERAGE ( FactPlanComparison[served_percent] )
+    DIVIDE ( AVERAGE ( FactPlanComparison[served_percent] ), 100 )
 
 Strict Storage Optimised Saving vs Rule ($M) =
     CALCULATE ( SUM ( FactStrictStorage[cost_musd] ), FactStrictStorage[plan] = "Rule of thumb" )
@@ -93,4 +96,4 @@ Sensitivity Cost ($M) =
     AVERAGE ( FactSensitivity[cost_musd] )
 
 Sensitivity Service Level % =
-    AVERAGE ( FactSensitivity[served_percent] )
+    DIVIDE ( AVERAGE ( FactSensitivity[served_percent] ), 100 )

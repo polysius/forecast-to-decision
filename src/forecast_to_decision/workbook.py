@@ -5,6 +5,8 @@ cannot create them. Only INDEX, MATCH, SUMIFS and SUMPRODUCT style functions are
 so every formula works in any recent version of Excel.
 """
 
+import re
+import zipfile
 from pathlib import Path
 
 import pandas as pd
@@ -45,6 +47,21 @@ GRID_STEP_POINTS = 5
 GRID_MIN_POINTS = -15
 GRID_MAX_POINTS = 15
 PLAN_NAMES = ("Rule of thumb", "Optimised plan", "Perfect hindsight")
+
+
+GENERIC_AUTHOR = "forecast-to-decision"
+
+
+def _decimal_validation(limit: float, what: str) -> DataValidation:
+    """Reject values outside +/- limit with a message, instead of accepting them silently."""
+    validation = DataValidation(
+        type="decimal", operator="between", formula1=str(-limit), formula2=str(limit)
+    )
+    validation.showErrorMessage = True
+    validation.errorStyle = "stop"
+    validation.errorTitle = "Value out of range"
+    validation.error = f"Enter {what} between {-limit:.0%} and {limit:.0%}"
+    return validation
 
 
 def _add_table(sheet: Worksheet, name: str, first_column: int, n_rows: int, n_columns: int) -> None:
@@ -94,6 +111,7 @@ def _write_guide(sheet: Worksheet) -> None:
         "Sheets",
         "  Data: one row per month and sector. Revenue columns are formulas (volume x price / 1000).",
         "  Variance: the gap between forecast and actual revenue, split into four effects.",
+        "    The effects are fixed values; editing Data makes the check column non-zero.",
         "  Pivots: PivotTables on the two tables above. Use Data > Refresh All after any change.",
         "  Lookup: pick a month and read its volumes, prices, variance effects and supply plan.",
         "  Scenario: change demand and prices, and test a forecast error against the supply plans.",
@@ -147,6 +165,15 @@ def _write_variance_sheet(sheet: Worksheet, tables: ReportingTables, data_rows: 
     for column in range(6, 14):
         _format_column(sheet, column, n_rows, "#,##0.0;[Red]-#,##0.0")
     _add_table(sheet, "tblVariance", 1, n_rows, len(VARIANCE_COLUMNS))
+    sheet.cell(
+        row=n_rows + 4,
+        column=1,
+        value=(
+            "Forecast and actual revenue are formulas on the Data sheet. The four effects are "
+            "values from the variance analysis, so editing the Data sheet makes the check "
+            "column non-zero. That is expected."
+        ),
+    ).font = NOTE_FONT
     sheet.freeze_panes = "A2"
     _widen(sheet, {"A": 10, "B": 12, "C": 20, "D": 20, "E": 9, "F": 20, "G": 18, "H": 14,
                    "I": 14, "J": 12, "K": 12, "L": 20, "M": 12})  # fmt: skip
@@ -193,6 +220,7 @@ def _write_lookup_sheet(
     default_month = "2025-01"  # a winter month shows the largest effects
     sheet["B3"] = default_month if default_month in months else months[len(months) // 2]
     sheet["B3"].fill = INPUT_FILL
+    sheet["B3"].number_format = "@"  # text, so "2025-01" is never turned into a date
     for row, label in enumerate(months, start=3):
         sheet.cell(row=row, column=8, value=label)
     sheet["H2"] = "Months"
@@ -316,10 +344,7 @@ def _write_scenario_sheet(
         cell = sheet.cell(row=row, column=2, value=default)
         cell.fill = INPUT_FILL
         cell.number_format = "0.0%"
-        validation = DataValidation(
-            type="decimal", operator="between", formula1=str(-limit), formula2=str(limit)
-        )
-        validation.error = f"Enter a change between {-limit:.0%} and {limit:.0%}"
+        validation = _decimal_validation(limit, "a change")
         sheet.add_data_validation(validation)
         validation.add(cell)
 
@@ -361,16 +386,19 @@ def _write_scenario_sheet(
     error_cell.fill = INPUT_FILL
     error_cell.number_format = "0.0%"
     limit = GRID_MAX_POINTS / 100
-    validation = DataValidation(
-        type="decimal", operator="between", formula1=str(-limit), formula2=str(limit)
-    )
-    validation.error = f"Enter an error between {-limit:.0%} and {limit:.0%}"
+    validation = _decimal_validation(limit, "an error")
     sheet.add_data_validation(validation)
     validation.add(error_cell)
 
     points_row, low_row, high_row, weight_row = (error_row + k for k in (1, 2, 3, 4))
-    sheet.cell(row=points_row, column=1, value="Error in percentage points")
-    sheet.cell(row=points_row, column=2, value=f"=B{error_row}*100")
+    sheet.cell(row=points_row, column=1, value="Error in percentage points (kept within the grid)")
+    # The clamp keeps the interpolation inside the tested range even if validation is bypassed,
+    # for example by pasting a value over the cell.
+    sheet.cell(
+        row=points_row,
+        column=2,
+        value=f"=MAX({GRID_MIN_POINTS},MIN({GRID_MAX_POINTS},B{error_row}*100))",
+    )
     sheet.cell(row=low_row, column=1, value="Grid point below")
     sheet.cell(
         row=low_row,
@@ -423,9 +451,42 @@ def _write_pivot_sheet(sheet: Worksheet) -> None:
     sheet["A2"].font = NOTE_FONT
 
 
+def scrub_workbook_metadata(path: Path) -> None:
+    """Remove the Office user name and local folder that Excel writes into the file on save.
+
+    Excel records who last saved the workbook, who refreshed each PivotTable, and the full
+    path of the folder it was saved in. None of that belongs in a published file.
+    """
+    generic = GENERIC_AUTHOR.encode()
+    rewrites = {
+        "docProps/core.xml": [
+            (rb"<cp:lastModifiedBy>.*?</cp:lastModifiedBy>", b"<cp:lastModifiedBy>" + generic + b"</cp:lastModifiedBy>"),
+            (rb"<dc:creator>.*?</dc:creator>", b"<dc:creator>" + generic + b"</dc:creator>"),
+        ],
+        "xl/workbook.xml": [
+            (rb"<mc:AlternateContent[^>]*>(?:(?!</mc:AlternateContent>).)*?absPath(?:(?!</mc:AlternateContent>).)*?</mc:AlternateContent>", b""),
+        ],
+    }  # fmt: skip
+    pivot_cache_rewrite = [(rb'refreshedBy="[^"]*"', b'refreshedBy="' + generic + b'"')]
+
+    temporary = path.with_suffix(".scrubbed")
+    with zipfile.ZipFile(path) as source, zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            data = source.read(item.filename)
+            patterns = rewrites.get(item.filename, [])
+            if item.filename.startswith("xl/pivotCache/pivotCacheDefinition"):
+                patterns = pivot_cache_rewrite
+            for pattern, replacement in patterns:
+                data = re.sub(pattern, replacement, data, flags=re.DOTALL)
+            target.writestr(item, data)
+    temporary.replace(path)
+
+
 def build_workbook(tables: ReportingTables, path: Path) -> None:
     """Write the workbook without PivotTables to `path`."""
     workbook = Workbook()
+    workbook.properties.creator = GENERIC_AUTHOR
+    workbook.properties.lastModifiedBy = GENERIC_AUTHOR
     guide = workbook.active
     guide.title = "Guide"
     data = workbook.create_sheet("Data")

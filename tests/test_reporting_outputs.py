@@ -90,6 +90,38 @@ def test_the_guide_lists_every_data_file_and_the_committed_guide_is_current(tabl
     assert (ROOT / "powerbi" / "POWERBI_GUIDE.md").read_text(encoding="utf-8") == guide
 
 
+def test_the_guide_gives_a_check_value_for_every_measure(tables):
+    guide = guide_text(tables)
+
+    for name in defined_measures(dax_text()):
+        assert f"| {name} |" in guide, f"no check value for {name}"
+
+
+def test_every_relationship_in_the_guide_uses_real_columns_and_the_one_side_is_unique(tables):
+    model = powerbi_tables(tables)
+    guide = guide_text(tables)
+    pairs = re.findall(r"\| `(\w+)\[(\w+)\]` \| `(\w+)\[(\w+)\]` \|", guide)
+
+    assert pairs
+    for one_table, one_column, many_table, many_column in pairs:
+        assert one_column in model[one_table].columns
+        assert many_column in model[many_table].columns
+        assert model[one_table][one_column].is_unique, f"{one_table}[{one_column}] is not unique"
+        values = set(model[one_table][one_column])
+        assert set(model[many_table][many_column]) <= values, f"{many_table}[{many_column}] has orphans"
+
+
+def test_no_table_can_be_filtered_by_two_different_paths(tables):
+    guide = guide_text(tables)
+    pairs = re.findall(r"\| `(\w+)\[\w+\]` \| `(\w+)\[\w+\]` \|", guide)
+    edges = {(one, many) for one, many in pairs}
+
+    # Find any pair of tables joined both directly and through a third table.
+    for one, many in edges:
+        for middle in {m for o, m in edges if o == one}:
+            assert (middle, many) not in edges, f"{one} reaches {many} directly and through {middle}"
+
+
 def test_the_date_table_is_daily_and_has_no_gaps(tables):
     dates = tables.calendar["date"]
 
@@ -136,8 +168,18 @@ def test_the_summary_refuses_to_publish_when_a_recommendation_is_no_longer_suppo
     flipped_saving = replace(findings, strict_rule_cost=findings.strict_optimised_cost + 10)
     forecast_wins = replace(findings, normal_weather_miss=findings.last_year_miss - 1)
     price_not_largest = replace(findings, effects={**findings.effects, "weather": 99_999.0})
+    plans_differ_in_past_winters = replace(
+        findings, optimised_short_scenarios=findings.rule_short_scenarios + 3
+    )
+    saving_not_small = replace(findings, optimised_cost=findings.rule_cost * 0.9)
 
-    for changed in (flipped_saving, forecast_wins, price_not_largest):
+    for changed in (
+        flipped_saving,
+        forecast_wins,
+        price_not_largest,
+        plans_differ_in_past_winters,
+        saving_not_small,
+    ):
         with pytest.raises(ValueError, match="Rewrite the business summary"):
             check_findings(changed)
     check_findings(findings)
@@ -241,6 +283,44 @@ def validated_cells(sheet) -> set[str]:
         for cell_range in validation.sqref.ranges:
             cells.update(f"{get_column_letter(column)}{row}" for row, column in cell_range.cells)
     return cells
+
+
+def test_validation_rejects_bad_values_instead_of_only_existing():
+    scenario = load_workbook(WORKBOOK)["Scenario"]
+
+    for validation in scenario.data_validations.dataValidation:
+        assert validation.showErrorMessage is True
+        # "stop" is the file format's default, so Excel leaves the attribute out when it saves.
+        assert validation.errorStyle in (None, "stop")
+
+
+def test_the_error_input_is_clamped_to_the_tested_grid_even_if_validation_is_bypassed():
+    scenario = load_workbook(WORKBOOK)["Scenario"]
+    formulas = [cell.value for row in scenario.iter_rows() for cell in row]
+
+    assert any(
+        isinstance(value, str) and value.startswith("=MAX(-15,MIN(15,") for value in formulas
+    )
+
+
+def test_the_lookup_month_cell_is_text_so_it_cannot_turn_into_a_date():
+    lookup = load_workbook(WORKBOOK)["Lookup"]
+
+    assert lookup["B3"].number_format == "@"
+
+
+def test_the_workbook_holds_no_personal_name_or_local_path():
+    with zipfile.ZipFile(WORKBOOK) as archive:
+        parts = {name: archive.read(name).decode("utf-8", errors="replace") for name in archive.namelist()}
+
+    core = parts["docProps/core.xml"]
+    assert "<cp:lastModifiedBy>forecast-to-decision</cp:lastModifiedBy>" in core
+    assert "<dc:creator>forecast-to-decision</dc:creator>" in core
+    for name, text in parts.items():
+        assert "absPath" not in text, name
+        assert "C:\\Users" not in text, name
+        if name.startswith("xl/pivotCache/pivotCacheDefinition"):
+            assert 'refreshedBy="forecast-to-decision"' in text
 
 
 def test_every_input_cell_has_validation():
