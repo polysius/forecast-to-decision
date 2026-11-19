@@ -298,15 +298,9 @@ def test_validation_rejects_bad_values_instead_of_only_existing():
         assert validation.errorStyle in (None, "stop")
 
 
-def test_the_error_input_formula_contains_the_clamp():
-    """Checks the formula text only. add_pivots.ps1 checks the behaviour with Excel on every
-    build: it writes +/-40% into the input and fails unless the costs equal the +/-15% row."""
-    scenario = load_workbook(WORKBOOK)["Scenario"]
-    formulas = [cell.value for row in scenario.iter_rows() for cell in row]
-
-    assert any(
-        isinstance(value, str) and value.startswith("=MAX(-15,MIN(15,") for value in formulas
-    )
+# There is no pytest check for the clamp on the scenario error input, because only Excel can
+# evaluate the formulas. scripts/add_pivots.ps1 checks it by behaviour on every build: it writes
+# +/-40% into the input and fails unless the plan costs equal those at +/-15%.
 
 
 def test_the_lookup_month_cell_is_text_so_it_cannot_turn_into_a_date():
